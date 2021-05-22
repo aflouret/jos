@@ -105,8 +105,13 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+	result = nextfree;
 
-	return NULL;
+	if(n%PGSIZE == 0)
+		nextfree += n;
+	else nextfree += (n/PGSIZE+1)*PGSIZE;
+
+	return result;
 }
 
 // Set up a two-level page table:
@@ -128,7 +133,7 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+	//panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -153,7 +158,8 @@ mem_init(void)
 	// memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
+	pages = boot_alloc(npages*sizeof(struct PageInfo));
+	memset(pages, 0, npages*sizeof(struct PageInfo));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -256,11 +262,13 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
-	size_t i;
-	for (i = 0; i < npages; i++) {
+	void *next_free_pa = boot_alloc(0)-KERNBASE;
+	for (size_t i = 0; i < npages; i++) {
 		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+		if(i != 0 && (i < IOPHYSMEM/PGSIZE || i >= (size_t)next_free_pa/PGSIZE)) {
+			pages[i].pp_link = page_free_list;
+			page_free_list = &pages[i];
+		}	
 	}
 }
 
@@ -280,7 +288,17 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	return 0;
+	if(page_free_list == NULL)
+		return NULL;
+
+	struct PageInfo* new_page = page_free_list;
+	page_free_list = page_free_list->pp_link;
+	new_page->pp_link = NULL;
+
+	if(alloc_flags == ALLOC_ZERO)
+		memset((void*)page2kva(new_page), '\0', PGSIZE);
+
+	return new_page;
 }
 
 //
@@ -293,6 +311,11 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	if(pp->pp_ref != 0 || pp->pp_link != NULL)
+		panic("pp->pp_ref is nonzero or pp->pp_link is not NULL");
+
+	pp->pp_link = page_free_list;
+	page_free_list = pp;
 }
 
 //
