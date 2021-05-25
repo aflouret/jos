@@ -357,21 +357,20 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	pde_t* pgdir_entry = pgdir + PDX(va);
+	pde_t *pgdir_entry = pgdir + PDX(va);
 	if (*pgdir_entry == 0 && create == false)
 		return NULL;
 	if (*pgdir_entry == 0) {
-
-		struct PageInfo* new_page_table = page_alloc(ALLOC_ZERO);
+		struct PageInfo *new_page_table = page_alloc(ALLOC_ZERO);
 		if (new_page_table == NULL)
 			return NULL;
 		new_page_table->pp_ref++;
 
-		*pgdir_entry = (pde_t)page2pa(new_page_table);
+		*pgdir_entry = (pde_t) page2pa(new_page_table);
 	}
 
 	*pgdir_entry |= PTE_P | PTE_W | PTE_U;
-	return (pte_t*) KADDR(PTE_ADDR(*pgdir_entry)) + PTX(va);
+	return (pte_t *) KADDR(PTE_ADDR(*pgdir_entry)) + PTX(va);
 }
 
 //
@@ -419,13 +418,13 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	pte_t* pgtable_entry = pgdir_walk(pgdir, va, true);
+	pte_t *pgtable_entry = pgdir_walk(pgdir, va, true);
 	if (pgtable_entry == NULL) {
 		return -E_NO_MEM;
 	}
 
 	pp->pp_ref++;
-	if (*pgtable_entry != 0) 
+	if (*pgtable_entry != 0)
 		page_remove(pgdir, va);
 
 	*pgtable_entry = page2pa(pp) | perm | PTE_P;
@@ -447,10 +446,10 @@ struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	pte_t* pgtable_entry = pgdir_walk(pgdir, va, false);
+	pte_t *pgtable_entry = pgdir_walk(pgdir, va, false);
 	if (pgtable_entry == NULL)
 		return NULL;
-	
+
 	if (pte_store != 0)
 		*pte_store = pgtable_entry;
 
@@ -477,14 +476,13 @@ page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
 	pte_t *pg_entry;
-	struct PageInfo *page = page_lookup(pgdir,va, &pg_entry);
-	if(page == NULL)
+	struct PageInfo *page = page_lookup(pgdir, va, &pg_entry);
+	if (page == NULL)
 		return;
 
 	page_decref(page);
 	*pg_entry = 0;
-	tlb_invalidate(pgdir,va);	
-
+	tlb_invalidate(pgdir, va);
 }
 
 //
