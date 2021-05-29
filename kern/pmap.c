@@ -185,6 +185,15 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 
+
+	size_t pages_array_size = npages * sizeof(struct PageInfo);
+	boot_map_region(kern_pgdir, UPAGES, pages_array_size, PADDR(pages), PTE_U);
+	boot_map_region(kern_pgdir,
+	                (uintptr_t) pages,
+	                pages_array_size,
+	                PADDR(pages),
+	                PTE_W);
+
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -197,6 +206,14 @@ mem_init(void)
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
 
+
+	boot_map_region(kern_pgdir,
+	                KSTACKTOP - KSTKSIZE,
+	                KSTKSIZE,
+	                PADDR(bootstack),
+	                PTE_W);
+
+
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -205,6 +222,9 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+
+	boot_map_region(kern_pgdir, KERNBASE, 0x100000000 - KERNBASE, 0, PTE_W);
+
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -387,7 +407,15 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	// Fill this function in
+	// Revisar
+	for (size_t i = 0; i < size / PGSIZE; i++) {
+		// cprintf("va: %08x, pa: %08x\n",(va+(i*PGSIZE)), (pa+(i*PGSIZE)));
+		pte_t *pgtable_entry =
+		        pgdir_walk(pgdir, (void *) (va + (i * PGSIZE)), true);
+		if (pgtable_entry == NULL)
+			return;
+		*pgtable_entry = (pa + (i * PGSIZE)) | perm | PTE_P;
+	}
 }
 
 //
