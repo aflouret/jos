@@ -404,28 +404,28 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 // mapped pages.
 //
 // Hint: the TA solution uses pgdir_walk
+//#define TP1_PSE
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 #ifndef TP1_PSE
-	for (size_t i = 0; i < size / PGSIZE; i++) {
-		// cprintf("va: %08x, pa: %08x\n",(va+(i*PGSIZE)), (pa+(i*PGSIZE)));
-		pte_t *pgtable_entry =
-		        pgdir_walk(pgdir, (void *) (va + (i * PGSIZE)), true);
-		if (pgtable_entry == NULL)
-			return;
-		*pgtable_entry = (pa + (i * PGSIZE)) | perm | PTE_P;
-	}
+	size_t j = 0;
 #else
-	for (size_t i = 0; i < size / PGSIZE; i++) {
-		// cprintf("va: %08x, pa: %08x\n",(va+(i*PGSIZE)), (pa+(i*PGSIZE)));
+	size_t i;
+	for (i = 0; i < size / PTSIZE; i++) {
+		pgdir[PDX(va) + i] = (pa + i*PTSIZE) | perm | PTE_P | PTE_PS;
+	}
+
+	size_t j = i * 1024;
+#endif
+
+	for (; j < size / PGSIZE; j++) {
 		pte_t *pgtable_entry =
-		        pgdir_walk(pgdir, (void *) (va + (i * PGSIZE)), true);
+		        pgdir_walk(pgdir, (void *) (va + (j * PGSIZE)), true);
 		if (pgtable_entry == NULL)
 			return;
-		*pgtable_entry = (pa + (i * PGSIZE)) | perm | PTE_P;
+		*pgtable_entry = (pa + (j * PGSIZE)) | perm | PTE_P;
 	}
-#endif
 }
 
 //
