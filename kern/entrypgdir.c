@@ -1,7 +1,6 @@
 #include <inc/mmu.h>
 #include <inc/memlayout.h>
 
-pte_t entry_pgtable[2];
 
 // The entry.S page directory maps the first 4MB of physical memory
 // starting at virtual address KERNBASE (that is, it maps virtual
