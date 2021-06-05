@@ -114,6 +114,12 @@ env_init(void)
 	// Set up envs array
 	// LAB 3: Your code here.
 
+	for (int i = NENV - 1; i >= 0; i--) {
+		envs[i].env_id = 0;
+		envs[i].env_link = env_free_list;
+		env_free_list = &envs[i];
+	}
+
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -177,6 +183,10 @@ env_setup_vm(struct Env *e)
 
 	// LAB 3: Your code here.
 
+	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
+	e->env_pgdir[PDX(UTOP) - 1] = 0 | PTE_W | PTE_U;
+	p->pp_ref++;
+
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -211,7 +221,6 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	if (generation <= 0)  // Don't create a negative env_id.
 		generation = 1 << ENVGENSHIFT;
 	e->env_id = generation | (e - envs);
-
 	// Set the basic status variables.
 	e->env_parent_id = parent_id;
 	e->env_type = ENV_TYPE_USER;
