@@ -182,9 +182,8 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-
+	e->env_pgdir = page2kva(p);
 	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
-	e->env_pgdir[PDX(UTOP) - 1] = 0 | PTE_W | PTE_U;
 	p->pp_ref++;
 
 	// UVPT maps the env's own page table read-only.
@@ -273,6 +272,15 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	if(len == 0) return;
+
+	for(int i=ROUNDDOWN( (uint32_t) va,PGSIZE); i< ROUNDUP( (uint32_t) (va+len),PGSIZE); i+=PGSIZE){
+		struct PageInfo *p = page_alloc(0);	
+		if(!p) return;
+		if(page_insert(e->env_pgdir,p, (void*) i,PTE_U | PTE_W) == -E_NO_MEM)
+			return;
+	}
 }
 
 //
@@ -330,10 +338,34 @@ load_icode(struct Env *e, uint8_t *binary)
 
 	// LAB 3: Your code here.
 
+	struct Elf* elf = (struct Elf *)binary;
+	if(elf->e_magic != ELF_MAGIC)
+		panic("Binary is not elf");
+	
+
+	for(int i=0; i < elf->e_phnum; i++){
+		struct Proghdr* ph = (struct Proghdr*) (binary + elf->e_phoff + i*(elf->e_phentsize));
+		if(ph->p_type == ELF_PROG_LOAD){
+			region_alloc(e, (void*) ph->p_va, ph->p_memsz);
+			lcr3(PADDR(e->env_pgdir));
+			memset((void*) ph->p_va, 0, ph->p_filesz);
+			memcpy((void*) ph->p_va, binary + ph->p_offset, ph->p_filesz);
+			lcr3(PADDR(kern_pgdir));
+		}
+	}
+	//Revisar
+	e->env_tf.tf_cs = elf->e_entry;
+
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
 	// LAB 3: Your code here.
+	struct PageInfo *p = page_alloc(0);
+	if(!p)
+		panic("Page not allocated.");
+
+	if(page_insert(e->env_pgdir, p, USTACKTOP - PGSIZE, PTE_U | PTE_W) == -E_NO_MEM)
+		panic("No memory.");
 }
 
 //
@@ -347,6 +379,10 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env* new_env;
+	if(env_alloc(&new_env,0) != 0) return;
+	new_env->env_type = type;
+	load_icode(new_env,binary);
 }
 
 //
