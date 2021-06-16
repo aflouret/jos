@@ -354,7 +354,8 @@ load_icode(struct Env *e, uint8_t *binary)
 		}
 	}
 	//Revisar
-	e->env_tf.tf_cs = elf->e_entry;
+	e->env_tf.tf_eip = elf->e_entry;
+	e->env_tf.tf_esp = USTACKTOP;
 
 
 	// Now map one page for the program's initial stack
@@ -364,7 +365,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	if(!p)
 		panic("Page not allocated.");
 
-	if(page_insert(e->env_pgdir, p, USTACKTOP - PGSIZE, PTE_U | PTE_W) == -E_NO_MEM)
+	if(page_insert(e->env_pgdir, p, (void*)(USTACKTOP - PGSIZE), PTE_U | PTE_W) == -E_NO_MEM)
 		panic("No memory.");
 }
 
@@ -380,7 +381,10 @@ env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
 	struct Env* new_env;
-	if(env_alloc(&new_env,0) != 0) return;
+	int err = env_alloc(&new_env,0); 
+	if(err < 0)
+		panic("env_create: %e\n", err);
+	new_env->env_parent_id = 0;
 	new_env->env_type = type;
 	load_icode(new_env,binary);
 }
@@ -500,5 +504,11 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 
-	panic("env_run not yet implemented");
+	if(curenv != NULL && curenv->env_status == ENV_RUNNING)
+		curenv->env_status = ENV_RUNNABLE;
+	curenv = e;
+	curenv->env_status = ENV_RUNNING;
+	curenv->env_runs++;
+	lcr3(PADDR(e->env_pgdir));
+	env_pop_tf(&e->env_tf);
 }
