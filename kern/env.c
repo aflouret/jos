@@ -273,12 +273,17 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
 
-	if(len == 0) return;
+	if (len == 0)
+		return;
 
-	for(int i=ROUNDDOWN( (uint32_t) va,PGSIZE); i< ROUNDUP( (uint32_t) (va+len),PGSIZE); i+=PGSIZE){
-		struct PageInfo *p = page_alloc(0);	
-		if(!p) return;
-		if(page_insert(e->env_pgdir,p, (void*) i,PTE_U | PTE_W) == -E_NO_MEM)
+	for (int i = ROUNDDOWN((uint32_t) va, PGSIZE);
+	     i < ROUNDUP((uint32_t)(va + len), PGSIZE);
+	     i += PGSIZE) {
+		struct PageInfo *p = page_alloc(0);
+		if (!p)
+			return;
+		if (page_insert(e->env_pgdir, p, (void *) i, PTE_U | PTE_W) ==
+		    -E_NO_MEM)
 			return;
 	}
 }
@@ -338,22 +343,25 @@ load_icode(struct Env *e, uint8_t *binary)
 
 	// LAB 3: Your code here.
 
-	struct Elf* elf = (struct Elf *)binary;
-	if(elf->e_magic != ELF_MAGIC)
+	struct Elf *elf = (struct Elf *) binary;
+	if (elf->e_magic != ELF_MAGIC)
 		panic("Binary is not elf");
-	
 
-	for(int i=0; i < elf->e_phnum; i++){
-		struct Proghdr* ph = (struct Proghdr*) (binary + elf->e_phoff + i*(elf->e_phentsize));
-		if(ph->p_type == ELF_PROG_LOAD){
-			region_alloc(e, (void*) ph->p_va, ph->p_memsz);
+
+	for (int i = 0; i < elf->e_phnum; i++) {
+		struct Proghdr *ph = (struct Proghdr *) (binary + elf->e_phoff +
+		                                         i * (elf->e_phentsize));
+		if (ph->p_type == ELF_PROG_LOAD) {
+			region_alloc(e, (void *) ph->p_va, ph->p_memsz);
 			lcr3(PADDR(e->env_pgdir));
-			memset((void*) ph->p_va, 0, ph->p_filesz);
-			memcpy((void*) ph->p_va, binary + ph->p_offset, ph->p_filesz);
+			memset((void *) ph->p_va, 0, ph->p_filesz);
+			memcpy((void *) ph->p_va,
+			       binary + ph->p_offset,
+			       ph->p_filesz);
 			lcr3(PADDR(kern_pgdir));
 		}
 	}
-	//Revisar
+	// Revisar
 	e->env_tf.tf_eip = elf->e_entry;
 	e->env_tf.tf_esp = USTACKTOP;
 
@@ -362,10 +370,13 @@ load_icode(struct Env *e, uint8_t *binary)
 	// at virtual address USTACKTOP - PGSIZE.
 	// LAB 3: Your code here.
 	struct PageInfo *p = page_alloc(0);
-	if(!p)
+	if (!p)
 		panic("Page not allocated.");
 
-	if(page_insert(e->env_pgdir, p, (void*)(USTACKTOP - PGSIZE), PTE_U | PTE_W) == -E_NO_MEM)
+	if (page_insert(e->env_pgdir,
+	                p,
+	                (void *) (USTACKTOP - PGSIZE),
+	                PTE_U | PTE_W) == -E_NO_MEM)
 		panic("No memory.");
 }
 
@@ -380,13 +391,13 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
-	struct Env* new_env;
-	int err = env_alloc(&new_env,0); 
-	if(err < 0)
+	struct Env *new_env;
+	int err = env_alloc(&new_env, 0);
+	if (err < 0)
 		panic("env_create: %e\n", err);
 	new_env->env_parent_id = 0;
 	new_env->env_type = type;
-	load_icode(new_env,binary);
+	load_icode(new_env, binary);
 }
 
 //
@@ -504,7 +515,7 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 
-	if(curenv != NULL && curenv->env_status == ENV_RUNNING)
+	if (curenv != NULL && curenv->env_status == ENV_RUNNING)
 		curenv->env_status = ENV_RUNNABLE;
 	curenv = e;
 	curenv->env_status = ENV_RUNNING;
