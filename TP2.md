@@ -177,3 +177,12 @@ Como resultado de ejecutar `iret`, se observa que ahora todos los registros cont
 
 10. 
 La instruccion `int 0x30` intenta ejecutar una syscall, pero la syscall no esta implementada. Por lo tanto, ocurre un error SIGQUIT.
+
+user_evil_hello
+---------------
+
+La diferencia entre evilhello.c y el código mencionado es que en este último en la línea ` char first = *entry; ` se intenta desreferenciar un puntero que contiene una dirección del kernel y la mmu no lo permite porque el programa está corriendo en modo usuario.
+Es decir, durante la ejecución del programa la cpu se encuenra en ring 3 (user mode) mientras que la página a la que se intenta acceder no tiene permisos de user ya que solo puede ser utilizada cuando la cpu se encuentra en ring 0 (kernel mode).
+En cambio, en `evilhello.c` se logra acceder a la dirección porque se realiza dentro de la syscall (y no antes), por lo que la cpu se encuentra en ring 0 para este momento.
+En el código de ejemplo, se intenta acceder a la dirección `0xf010000c` la cual es la dirección del primer caracter del código del kernel.
+En el código de `evilhello.c`, se logra acceder a la misma dirección y sus 99 caracteres contiguos, ya que sys_cputs se llama con un size de 100 caracteres, por lo que se accederá hasta la dirección `0xf0100070`

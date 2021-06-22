@@ -196,11 +196,6 @@ mem_init(void)
 
 	size_t pages_array_size = npages * sizeof(struct PageInfo);
 	boot_map_region(kern_pgdir, UPAGES, pages_array_size, PADDR(pages), PTE_U);
-	boot_map_region(kern_pgdir,
-	                (uintptr_t) pages,
-	                pages_array_size,
-	                PADDR(pages),
-	                PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -212,7 +207,6 @@ mem_init(void)
 
 	size_t env_size = NENV * sizeof(struct Env);
 	boot_map_region(kern_pgdir, UENVS, env_size, PADDR(envs), PTE_U | PTE_P);
-	boot_map_region(kern_pgdir, (uintptr_t) envs, env_size, PADDR(envs), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -579,6 +573,19 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	for (int i = (uint32_t) va; i < (uint32_t) ROUNDUP(va + len, PGSIZE);
+	     i += PGSIZE - (i % PGSIZE)) {
+		if ((uint32_t) i > ULIM) {
+			user_mem_check_addr = (uintptr_t) i;
+			return -E_FAULT;
+		}
+		pte_t *pte = pgdir_walk(env->env_pgdir, (void *) i, false);
+		if (!pte || ((*pte & (PTE_P | perm)) == 0)) {
+			user_mem_check_addr = (uintptr_t) i;
+			return -E_FAULT;
+		}
+	}
+
 
 	return 0;
 }
