@@ -4,13 +4,14 @@ TP2: Procesos de usuario
 env_alloc
 ---------
 
-...
+1. Los id de los procesos serían 0x00001000, 0x00001001, 0x00001002, 0x00001003 y 0x00001004. Los 12 bits menos significativos representan a la posición en el arreglo envs y el resto de los bits corresponden a la generación, es decir el numero de veces que se usó la misma posición en el arreglo.
+2. El primer proceso que se encuenta en `env[630]` tiene como id 0x00001276. Al destruirlo y crear otro en la misma posición, aumentará su generación en 1000 por lo que su id será 0x00002276. Por lo que para las siguientes 3 iteraciones será: 0x0003276, 0x0004276 y 0x0005276. 
 
 
 env_init_percpu
 ---------------
 
-...
+La función `lgdt` escribe 6 bytes en el registro `GDTR`, los cuales 4 bytes representan la base address de la GDT y los otros 2 son el limit de la GDT 
 
 
 env_pop_tf
