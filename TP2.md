@@ -179,6 +179,22 @@ Como resultado de ejecutar `iret`, se observa que ahora todos los registros cont
 10. 
 La instruccion `int 0x30` intenta ejecutar una syscall, pero la syscall no esta implementada. Por lo tanto, ocurre un error SIGQUIT.
 
+kern_idt
+---------------
+
+1. Se debe usar TRAPHANDLER si la interrupcion pushea un codigo de error, y TRAPHANDLER_NOEC si no lo hace. Esta informacion se encuentra en la tabla de interrupciones del manual de IA32. 
+TRAPHANDLER_NOEC pushea en el stack un 0 para que el stack tenga la misma cantidad de elementos en ambos casos, manteniendo la estructura de un trapframe. Si solo se usara TRAPHANDLER, en los casos en que la interrupcion no pushee un codigo de error, la lectura del trapframe seria incorrecta porque los contenidos del stack no conservarian la estructura de un trapframe, ya que faltaria un elemento correspondiente al error (tf_err).
+
+2. El valor del parametro `istrap` determina el tipo de gate, es decir, si sera una trap gate (`istrap =  1`) o una interrupt gate (`istrap = 0`).
+Si es una interrupt gate, al ejecutarse una interrupcion se resetea el valor de la interrupt flag (IF). Esto impide que durante el handling de la interrupcion se ejecuten otras interrupciones.
+Si es una trap gate, esto no sucede. 
+En el caso de las syscalls se utiliza una trap gate, ya que el comportamiento buscado es el de una trap, es decir, se desea que durante la syscall se pueda handlear otras interrupciones.
+
+3. `softint.c` trata de generar una interrupcion de tipo Page Fault (`int 14`). Sin embargo, la ejecucion genera un General Protection Fault, debido a que Page Fault es una interrupcion que solamente puede ser llamada en ring 0, y `softint.c` se ejecuta en un proceso de ring 3. El mecanismo por el que ocurre esto es que el nivel de privilegio actual (CPL) se compara con el nivel de privilegio del descriptor (DPL) en el gate descriptor de la interrupcion Page Fault en la IDT. El CPL es 3 porque el proceso esta ejecutandose en ring 3 y el DPL de Page Fault es 0.
+Para cambiar este comportamiento habria que cambiar el DPL de Page Fault a 3.
+
+
+
 user_evil_hello
 ---------------
 
