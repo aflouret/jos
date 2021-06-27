@@ -401,9 +401,9 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		new_page_table->pp_ref++;
 
 		*pgdir_entry = (pde_t) page2pa(new_page_table);
+		*pgdir_entry |= PTE_P | PTE_W | PTE_U;
 	}
 
-	*pgdir_entry |= PTE_P | PTE_W | PTE_U;
 	return (pte_t *) KADDR(PTE_ADDR(*pgdir_entry)) + PTX(va);
 }
 

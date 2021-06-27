@@ -361,7 +361,6 @@ load_icode(struct Env *e, uint8_t *binary)
 			lcr3(PADDR(kern_pgdir));
 		}
 	}
-	// Revisar
 	e->env_tf.tf_eip = elf->e_entry;
 	e->env_tf.tf_esp = USTACKTOP;
 
