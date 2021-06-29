@@ -290,6 +290,10 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	for(int i=0; i < NCPU; i++){
+		uintptr_t kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		boot_map_region(kern_pgdir,(uintptr_t) kstacktop_i - KSTKSIZE,KSTKSIZE,PADDR(&percpu_kstacks[i][0]), PTE_P | PTE_W);
+	}
 }
 
 // --------------------------------------------------------------
@@ -328,10 +332,14 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+
+	_Static_assert(MPENTRY_PADDR % PGSIZE == 0,
+               "MPENTRY_PADDR is not page-aligned");
+
 	void *next_free_pa = boot_alloc(0) - KERNBASE;
 	for (size_t i = 0; i < npages; i++) {
 		pages[i].pp_ref = 0;
-		if (i != 0 && (i < IOPHYSMEM / PGSIZE ||
+		if (i != 0 && i != 7 && (i < IOPHYSMEM / PGSIZE ||
 		               i >= (size_t) next_free_pa / PGSIZE)) {
 			pages[i].pp_link = page_free_list;
 			page_free_list = &pages[i];
