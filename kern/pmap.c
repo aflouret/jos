@@ -290,9 +290,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-	for(int i=0; i < NCPU; i++){
+	for (int i = 0; i < NCPU; i++) {
 		uintptr_t kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
-		boot_map_region(kern_pgdir,(uintptr_t) kstacktop_i - KSTKSIZE,KSTKSIZE,PADDR(&percpu_kstacks[i][0]), PTE_P | PTE_W);
+		boot_map_region(kern_pgdir,
+		                (uintptr_t) kstacktop_i - KSTKSIZE,
+		                KSTKSIZE,
+		                PADDR(&percpu_kstacks[i][0]),
+		                PTE_P | PTE_W);
 	}
 }
 
@@ -334,13 +338,14 @@ page_init(void)
 	// free pages!
 
 	_Static_assert(MPENTRY_PADDR % PGSIZE == 0,
-               "MPENTRY_PADDR is not page-aligned");
+	               "MPENTRY_PADDR is not page-aligned");
 
 	void *next_free_pa = boot_alloc(0) - KERNBASE;
 	for (size_t i = 0; i < npages; i++) {
 		pages[i].pp_ref = 0;
-		if (i != 0 && i != 7 && (i < IOPHYSMEM / PGSIZE ||
-		               i >= (size_t) next_free_pa / PGSIZE)) {
+		if (i != 0 && i != 7 &&
+		    (i < IOPHYSMEM / PGSIZE ||
+		     i >= (size_t) next_free_pa / PGSIZE)) {
 			pages[i].pp_link = page_free_list;
 			page_free_list = &pages[i];
 		}
@@ -620,7 +625,19 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+
+	void *result = (void *) base;
+
+	size_t roundup_size = ROUNDUP(size, PGSIZE);
+	if (base + roundup_size > MMIOLIM)
+		panic("MMIOLIM overflow");
+
+	boot_map_region(
+	        kern_pgdir, base, roundup_size, pa, PTE_PCD | PTE_PWT | PTE_W);
+
+	base += roundup_size;
+
+	return result;
 }
 
 static uintptr_t user_mem_check_addr;
