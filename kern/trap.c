@@ -14,7 +14,6 @@
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
 
-static struct Taskstate ts;
 
 /* For debugging, so print_trapframe can distinguish between printing
  * a saved trapframe and printing the current trapframe and print some
@@ -88,12 +87,13 @@ trap_init(void)
 	void trap_18();
 	void trap_19();
 	void trap_48();
+	void trap_32();
 
 	SETGATE(idt[T_DIVIDE], 0, GD_KT, trap_0, 0)
-	SETGATE(idt[T_DEBUG], 1, GD_KT, trap_1, 0)
+	SETGATE(idt[T_DEBUG], 0, GD_KT, trap_1, 0)
 	SETGATE(idt[T_NMI], 0, GD_KT, trap_2, 0)
-	SETGATE(idt[T_BRKPT], 1, GD_KT, trap_3, 3)
-	SETGATE(idt[T_OFLOW], 1, GD_KT, trap_4, 0)
+	SETGATE(idt[T_BRKPT], 0, GD_KT, trap_3, 3)
+	SETGATE(idt[T_OFLOW], 0, GD_KT, trap_4, 0)
 	SETGATE(idt[T_BOUND], 0, GD_KT, trap_5, 0)
 	SETGATE(idt[T_ILLOP], 0, GD_KT, trap_6, 0)
 	SETGATE(idt[T_DEVICE], 0, GD_KT, trap_7, 0)
@@ -107,7 +107,8 @@ trap_init(void)
 	SETGATE(idt[T_ALIGN], 0, GD_KT, trap_17, 0)
 	SETGATE(idt[T_MCHK], 0, GD_KT, trap_18, 0)
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, trap_19, 0)
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, trap_48, 3)
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, trap_48, 3)
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER],0,GD_KT, trap_32, 3)
 
 
 	// Per-CPU setup
@@ -141,20 +142,30 @@ trap_init_percpu(void)
 	//
 	// LAB 4: Your code here:
 
+	int id = cpunum();
+	struct CpuInfo *cpu = &cpus[id];
+	struct Taskstate *ts = &cpu->cpu_ts;
+
+
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
-	ts.ts_iomb = sizeof(struct Taskstate);
+
+	uintptr_t kstacktop_i = KSTACKTOP - id * (KSTKSIZE + KSTKGAP);
+	ts->ts_esp0 = kstacktop_i;
+	ts->ts_ss0 = GD_KD;
+	ts->ts_iomb = sizeof(struct Taskstate);
+	
+	uint16_t idx = (GD_TSS0 >> 3) + id;
+	uint16_t seg = idx << 3;
 
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] =
-	        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	gdt[idx] =
+	        SEG16(STS_T32A, (uint32_t)(ts), sizeof(struct Taskstate) - 1, 0);
+	gdt[idx].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	ltr(seg);
 
 	// Load the IDT
 	lidt(&idt_pd);
@@ -227,6 +238,9 @@ trap_dispatch(struct Trapframe *tf)
 		                              tf->tf_regs.reg_esi);
 
 		return;
+	case IRQ_OFFSET+IRQ_TIMER:
+		lapic_eoi();
+		sched_yield();
 	}
 
 	// Handle spurious interrupts
@@ -279,7 +293,7 @@ trap(struct Trapframe *tf)
 		// serious kernel work.
 		// LAB 4: Your code here.
 		assert(curenv);
-
+		lock_kernel();
 		// Garbage collect if current enviroment is a zombie
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);

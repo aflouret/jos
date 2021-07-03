@@ -65,3 +65,83 @@ El programa yield.c realiza una iteracion de 5 ciclos donde en cada uno se llama
 Hay 3 procesos creados en estado RUNNABLE, y el scheduler ejecuta el primero que encuentra en ese estado (env 1000). Este primer proceso, ya en estado RUNNING, comienza a iterar y llama a sys_yield. 
 Al hacerlo, el scheduler toma el proximo proceso RUNNABLE (env 1001) y lo ejecuta. Como este proceso tambien esta corriendo el programa yield.c, realizara lo mismo que el proceso 1000 y llamara a sys_yield. Por lo tanto, el scheduler levantara el siguiente proceso RUNNABLE disponible (env 1002), que tambien esta corriendo una instancia de yield.c. Cuando este ultimo proceso llame a sys_yield, el scheduler va a recorrer circularmente el arreglo hasta llegar nuevamente al env 1000.
 Esto se repite en las siguientes 4 iteraciones de yield.c para los 3 procesos.
+
+
+multicore_init
+---------
+1. `memmove(code, mpentry_start, mpentry_end - mpentry_start);` copia el código que empieza en `mpentry_start` y termina en `mpentry_end`, a su destino que es `code`, que sería la virtual address de `MPENTRY_PADDR` (0x7000). Este código se usa para bootear los APs y se encuentra en el archivo mpentry.S . El memmove es necesario de realizar ya que el código de booteo de los APs debe ser accesible por debajo de los 2^16 bytes de memoria física.
+
+2. `mpentry_kstack` guarda el tope del stack del kernel para cada CPU. Esta variable se setea en init y no en mpentry.S porque si se realizara en este último, todos los CPUs compartirían stack ya que el código es común para todos los CPUs, y el código en init.c contempla que hay N CPUs por lo que la memoria de cada stack estará reservada en direcciones diferentes.
+
+3. 
+
+```
+(gdb) watch mpentry_kstack
+Hardware watchpoint 1: mpentry_kstack
+(gdb) continue
+Continuing.
+The target architecture is assumed to be i386
+=> 0xf010015f <boot_aps+92>:    mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0x0
+New value = (void *) 0xf0254000 <percpu_kstacks+65536>
+boot_aps () at kern/init.c:109
+109                     lapic_startap(c->cpu_id, PADDR(code));
+(gdb) bt
+#0  boot_aps () at kern/init.c:109
+#1  0xf0100210 in i386_init () at kern/init.c:55
+#2  0xf0105e66 in ?? ()
+#3  0xf0100047 in entry () at kern/entry.S:88
+(gdb) info threads
+  Id   Target Id                    Frame 
+* 1    Thread 1.1 (CPU#0 [running]) boot_aps () at kern/init.c:109
+  2    Thread 1.2 (CPU#1 [halted ]) 0x000fd0ae in ?? ()
+  3    Thread 1.3 (CPU#2 [halted ]) 0x000fd0ae in ?? ()
+  4    Thread 1.4 (CPU#3 [halted ]) 0x000fd0ae in ?? ()
+(gdb) continue
+Continuing.
+=> 0xf010015f <boot_aps+92>:    mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0xf0254000 <percpu_kstacks+65536>
+New value = (void *) 0xf025c000 <percpu_kstacks+98304>
+boot_aps () at kern/init.c:109
+109                     lapic_startap(c->cpu_id, PADDR(code));
+(gdb) info threads
+  Id   Target Id                    Frame 
+* 1    Thread 1.1 (CPU#0 [running]) boot_aps () at kern/init.c:109
+  2    Thread 1.2 (CPU#1 [running]) 0xf01002a2 in mp_main () at kern/init.c:127
+  3    Thread 1.3 (CPU#2 [halted ]) 0x000fd0ae in ?? ()
+  4    Thread 1.4 (CPU#3 [halted ]) 0x000fd0ae in ?? ()
+(gdb) thread 2
+[Switching to thread 2 (Thread 1.2)]
+#0  0xf01002a2 in mp_main () at kern/init.c:127
+127             xchg(&thiscpu->cpu_status, CPU_STARTED);  // tell boot_aps() we're up
+(gdb) bt
+#0  0xf01002a2 in mp_main () at kern/init.c:127
+#1  0x00000000 in ?? ()
+(gdb) p cpunum()
+$1 = 1
+(gdb) thread 1
+[Switching to thread 1 (Thread 1.1)]
+#0  boot_aps () at kern/init.c:111
+111                     while (c->cpu_status != CPU_STARTED)
+(gdb) p cpunum()
+$2 = 0
+(gdb) continue
+Continuing.
+=> 0xf010015f <boot_aps+92>:    mov    %esi,%ecx
+
+Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+Old value = (void *) 0xf025c000 <percpu_kstacks+98304>
+New value = (void *) 0xf0264000 <percpu_kstacks+131072>
+boot_aps () at kern/init.c:109
+109                     lapic_startap(c->cpu_id, PADDR(code));
+```
+
+4. 
+
