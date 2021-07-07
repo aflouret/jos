@@ -11,6 +11,19 @@ En el TP2, `env_destroy()` simplemente liberaba el proceso y llamaba al monitor 
 En el TP3, si el proceso esta corriendo en otras CPUs, se cambia el estado del proceso de RUNNING a DYING, dejandolo como zombie. La siguiente vez que se llama a `env_destroy()`, el proceso se libera.
 Si el proceso que se quiere destruir es el actual, se cede la ejecucion a otro proceso mediante `sched_yield()`.
 
+envid2env
+---------
+
+Cuando se llama a `sys_env_destroy(0)`, dentro de esta función se realiza un llamado a `envid2env()` a la cual se le pasa el parámetro envid con valor 0. Esta función especifica que cuando envid vale 0, devolverá el curenv.
+```
+	// If envid is zero, return the current environment.
+	if (envid == 0) {
+		*env_store = curenv;
+		return 0;
+	}
+```
+
+Por lo tanto, en `sys_env_destroy()` la variable `e` será igual a curenv, y mediante `env_destroy(e)` se destruirá el proceso actual.
 
 sys_yield
 ---------
@@ -143,5 +156,8 @@ boot_aps () at kern/init.c:109
 109                     lapic_startap(c->cpu_id, PADDR(code));
 ```
 
-4. 
+4. Esta línea se encuentra algunas lineas después de mpentry_start, por lo tanto si se redondea a 12 bits, y sabiendo que el código de mpentry.S fue copiado a la dirección física 0x7000 (la cual corresponde a mpentry_start), el eip estará aproximadamente en la dirección 0x7000. Esto es teniendo en cuenta que mediante el lapic se configuraron los APs para que el eip inicien en esa dirección.
+
+Si se pone un breakpoint en mpentry_start, no se detendrá la ejecución ya que el valor del eip no coincide con la dirección del símbolo mpentry_start dado que fue copiado a la dirección mencionada anteriormente.
+
 
