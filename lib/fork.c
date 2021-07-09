@@ -58,6 +58,46 @@ duppage(envid_t envid, unsigned pn)
 	return 0;
 }
 
+static void
+dup_or_share(envid_t dstenv, void *va, int perm)
+{
+	int r;
+
+	// This is NOT what you should do in your fork.
+	if ((r = sys_page_alloc(dstenv, addr, PTE_P | PTE_U | PTE_W)) < 0)
+		panic("sys_page_alloc: %e", r);
+	if ((r = sys_page_map(dstenv, addr, 0, UTEMP, PTE_P | PTE_U | PTE_W)) < 0)
+		panic("sys_page_map: %e", r);
+	memmove(UTEMP, addr, PGSIZE);
+	if ((r = sys_page_unmap(0, UTEMP)) < 0)
+		panic("sys_page_unmap: %e", r);
+}
+
+envid_t
+fork_v0(void)
+{
+	envid_t envid;
+	uint8_t *addr;
+	int r;
+
+	envid = sys_exofork();
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	if (envid == 0) {
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	for (addr = 0; addr < UTOP; addr += PGSIZE) {
+		int perm = PTE_U | PTE_P;
+		pte_t pte = uvpt[PGNUM(addr)];
+		if (pte & PTE_W)
+			perm |= PTE_W;
+
+		dup_or_share(envid, addr, perm);
+	}
+}
+
 //
 // User-level fork with copy-on-write.
 // Set up our page fault handler appropriately.
@@ -78,7 +118,7 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+	return fork_v0();
 }
 
 // Challenge!

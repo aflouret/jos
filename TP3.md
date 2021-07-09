@@ -15,7 +15,7 @@ envid2env
 ---------
 
 Cuando se llama a `sys_env_destroy(0)`, dentro de esta función se realiza un llamado a `envid2env()` a la cual se le pasa el parámetro envid con valor 0. Esta función especifica que cuando envid vale 0, devolverá el curenv.
-```
+```C
 	// If envid is zero, return the current environment.
 	if (envid == 0) {
 		*env_store = curenv;
@@ -161,3 +161,47 @@ boot_aps () at kern/init.c:109
 Si se pone un breakpoint en mpentry_start, no se detendrá la ejecución ya que el valor del eip no coincide con la dirección del símbolo mpentry_start dado que fue copiado a la dirección mencionada anteriormente.
 
 
+dumbfork
+---------
+
+1. Si una pagina no es modificable en el padre, lo es en el hijo, porque cuando se duplican las paginas en duppage() se llama a sys_page_alloc() con permisos de escritura.
+
+2.
+
+Para verificar los permisos de una pagina, tenemos que acceder a la page table entry correspondiente. En espacio de usuario, esto se puede hacer a traves del arreglo uvpt[].
+
+```C
+envid_t dumbfork(void) {
+    // ...
+    for (addr = UTEXT; addr < end; addr += PGSIZE) {
+        bool readonly;
+        
+        pte_t pte = uvpt[PGNUM(addr)];
+        if(pte & PTE_W == 0)
+        	readonly = true;
+        else readonly = false;
+
+        duppage(envid, addr, readonly);
+    }
+```
+
+3.
+
+
+ipc_recv
+---------
+
+Si la syscall sys_ipc_recv() falla, ipc_recv() guarda un 0 en los parametros from_env_store y perm_store, si no son NULL.
+En este caso, from_env_store == &src. Entonces, hay que verificar si src == 0.
+
+```C
+envid_t src = -1;
+int r = ipc_recv(&src, 0, NULL);
+
+if (r < 0)
+  if (src == 0)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
+
+```
