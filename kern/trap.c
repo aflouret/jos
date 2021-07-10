@@ -108,7 +108,7 @@ trap_init(void)
 	SETGATE(idt[T_MCHK], 0, GD_KT, trap_18, 0)
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, trap_19, 0)
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, trap_48, 3)
-	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER],0,GD_KT, trap_32, 3)
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_32, 3)
 
 
 	// Per-CPU setup
@@ -154,7 +154,7 @@ trap_init_percpu(void)
 	ts->ts_esp0 = kstacktop_i;
 	ts->ts_ss0 = GD_KD;
 	ts->ts_iomb = sizeof(struct Taskstate);
-	
+
 	uint16_t idx = (GD_TSS0 >> 3) + id;
 	uint16_t seg = idx << 3;
 
@@ -238,7 +238,7 @@ trap_dispatch(struct Trapframe *tf)
 		                              tf->tf_regs.reg_esi);
 
 		return;
-	case IRQ_OFFSET+IRQ_TIMER:
+	case IRQ_OFFSET + IRQ_TIMER:
 		lapic_eoi();
 		sched_yield();
 	}
