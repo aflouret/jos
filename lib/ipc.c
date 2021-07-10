@@ -57,12 +57,11 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 	if (pg == NULL)
 		pg = (void *) UTOP;
 
-	int r = sys_ipc_try_send(to_env, val, pg, perm);
+	int r = sys_ipc_try_send(to_env, val, pg, (unsigned) perm);
 	while (r == -E_IPC_NOT_RECV) {
 		sys_yield();
 		r = sys_ipc_try_send(to_env, val, pg, perm);
 	}
-
 	if (r < 0 && r != -E_IPC_NOT_RECV)
 		panic("ipc_send");
 }

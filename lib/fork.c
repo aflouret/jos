@@ -61,16 +61,16 @@ duppage(envid_t envid, unsigned pn)
 static void
 dup_or_share(envid_t dstenv, void *va, int perm)
 {
+	perm &= PTE_SYSCALL;
 	int r;
-
-	// This is NOT what you should do in your fork.
-	if ((r = sys_page_alloc(dstenv, addr, PTE_P | PTE_U | PTE_W)) < 0)
-		panic("sys_page_alloc: %e", r);
-	if ((r = sys_page_map(dstenv, addr, 0, UTEMP, PTE_P | PTE_U | PTE_W)) < 0)
-		panic("sys_page_map: %e", r);
-	memmove(UTEMP, addr, PGSIZE);
-	if ((r = sys_page_unmap(0, UTEMP)) < 0)
-		panic("sys_page_unmap: %e", r);
+	if ((perm & PTE_W) == 0) {
+		sys_page_map(0, va, dstenv, va, perm);
+		return;
+	}
+	sys_page_alloc(dstenv, va, perm);
+	sys_page_map(dstenv, va, 0, UTEMP, perm);
+	memmove(UTEMP, va, PGSIZE);
+	sys_page_unmap(0, UTEMP);
 }
 
 envid_t
@@ -88,14 +88,26 @@ fork_v0(void)
 		return 0;
 	}
 
-	for (addr = 0; addr < UTOP; addr += PGSIZE) {
+	for (addr = 0; (uint32_t) addr < UTOP; addr += PGSIZE) {
 		int perm = PTE_U | PTE_P;
+		pde_t pde = uvpd[PDX(addr)];
+		if ((pde & PTE_P) == 0)
+			continue;
+
 		pte_t pte = uvpt[PGNUM(addr)];
+		if ((pte & PTE_P) == 0)
+			continue;
+
 		if (pte & PTE_W)
 			perm |= PTE_W;
 
 		dup_or_share(envid, addr, perm);
 	}
+
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+
+	return envid;
 }
 
 //

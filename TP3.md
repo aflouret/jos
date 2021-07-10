@@ -168,15 +168,20 @@ dumbfork
 
 2.
 
-Para verificar los permisos de una pagina, tenemos que acceder a la page table entry correspondiente. En espacio de usuario, esto se puede hacer a traves del arreglo uvpt[].
+Para verificar los permisos de una pagina, debemos verificar si la page table existe en el page directory. Para esto utilizamos uvpd, y en caso de que no exista la entrada, simplemente vamos a la siguiente address. Si existe, tenemos que acceder a la page table entry correspondiente. En espacio de usuario, esto se puede hacer a traves del arreglo uvpt[].
 
 ```C
 envid_t dumbfork(void) {
     // ...
     for (addr = UTEXT; addr < end; addr += PGSIZE) {
         bool readonly;
-        
+        pde_t pde = uvpd[PDX(addr)];
+        if(pde & PTE_P == 0)
+          continue;
+
         pte_t pte = uvpt[PGNUM(addr)];
+        if (pte & PTE_P == 0)
+          continue;
         if(pte & PTE_W == 0)
         	readonly = true;
         else readonly = false;
@@ -186,6 +191,20 @@ envid_t dumbfork(void) {
 ```
 
 3.
+Para los casos que se quiera copiar una dirección de solo lectura del padre al hijo, como sabemos que ninguno de los 2 va a modificar la página ya que es read only, simplemente mapeamos en el hijo la address en cuestión a la misma página que el padre apunta. En el caso de que se quiera escribir en el hijo, creamos una página nueva, la cual se mapea al page directory del hijo, y también se mapea temporalmente al padre para copiar el contenido de la page del padre en la nueva página.
+
+```C
+void duppage(envid_t dstenv, void *addr, bool readonly) {
+    if (readonly) {
+      sys_page_map(0, addr, dstenv, addr, PTE_P | PTE_U);
+      return;
+    }
+    sys_page_alloc(dstenv, addr, PTE_P | PTE_U | PTE_W);
+    sys_page_map(dstenv, addr, 0, UTEMP, PTE_P | PTE_U | PTE_W);
+    memmove(UTEMP, addr, PGSIZE);
+    sys_page_unmap(0, UTEMP);
+}
+```
 
 
 ipc_recv
