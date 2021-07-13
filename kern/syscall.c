@@ -139,7 +139,14 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-	panic("sys_env_set_pgfault_upcall not implemented");
+
+	struct Env *e;
+	int err = envid2env(envid, &e, 1);
+	if (err)
+		return err;
+
+	e->env_pgfault_upcall = func;
+	return 0;
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -332,7 +339,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if (err < 0)
 		return err;
 
-	if (dstenv->env_status != ENV_NOT_RUNNABLE || !dstenv->env_ipc_recving)
+	if (!dstenv->env_ipc_recving)
 		return -E_IPC_NOT_RECV;
 
 	if ((uint32_t) srcva < UTOP && (uint32_t) dstenv->env_ipc_dstva < UTOP) {
@@ -425,6 +432,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_ipc_try_send:
 		return sys_ipc_try_send(
 		        (envid_t) a1, (uint32_t) a2, (void *) a3, (unsigned) a4);
+	case SYS_env_set_pgfault_upcall:
+		return sys_env_set_pgfault_upcall((envid_t) a1, (void *) a2);
 
 	default:
 		return -E_INVAL;

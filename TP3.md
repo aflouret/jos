@@ -224,3 +224,74 @@ if (r < 0)
     puts("Valor negativo correcto.")
 
 ```
+
+sys_ipc_try_send
+---------
+La principal diferencia entre sys_ipc_try_send y sys_ipc_send presentada a continuación es que, en vez de devolver -E_IPC_NOT_RECV cuando el env destino no está queriendo recibir nada, el curenv se bloquea. Antes de hacerlo, setea los siguientes parámetros nuevos:
+ - bool env_ipc_sending : Equivalente a env_ipc_recving pero para el sending. Se setea a true.
+ - env_id env_ipc_to : Equivalente a env_ipc_from.
+ - uint32_t env_ipc_send_value 
+ - void* env_ipc_send_va
+ - unsigned env_ipc_send_perm
+
+En caso de que el dstenv quiera recibir, se ejecuta el mismo codigo que tiene sys_ipc_try_send.
+En el siguiente código se muestra esta implementación:
+
+```C
+sys_ipc_send(envid_t envid,uint32_t value, void *srcva, unsigned perm){
+
+	//Get dstenv with envid2env();
+
+  if (!dstenv->env_ipc_recving){
+    curenv->env_ipc_sending = true;
+    curenv->env_ipc_to = envid;
+    curenv->env_ipc_send_value = value;
+    curenv->env_ipc_send_va = srcva;
+    curenv->env_ipc_send_perm = perm;
+    curenv->env_status = ENV_NOT_RUNNABLE;
+    sys_yield();
+    return 0;
+  }
+
+  //Ejecutamos el resto del código de sys_ipc_try_send()
+}
+
+```
+
+En sys_ipc_recv, luego de validar dstva, se procede a recorrer el array de envs. Para cada env, se chequea si el env quiere enviar algo, y si el destino es el envid del curenv. En caso de serlo, se realiza el mapeo (si es necesario) de la dirección env_ipc_send_va y se obtiene el valor que se quiere enviar del campo env_ipc_send_value previamente mencionados. Además, se marca al env que realizó el send como ENV_RUNNABLE.
+Si no hay ningún proceso cuyo env_ipc_sending sea true y su env_ipc_to sea el id del curenv, entonces se ejecuta el código del sys_ipc_recv original, es decir, se bloqueará el proceso a la espera de otro proceso que quiera enviar algo.
+
+En el siguiente pseudocódigo se muestra la implementación:
+
+```C
+  
+sys_ipc_recv(void *dstva)
+{
+	// LAB 4: Your code here.
+  //Este codigo va al comienzo de sys_ipc_recv()
+  if ((uint32_t) dstva < UTOP) {
+		if ((uint32_t) dstva % PGSIZE != 0)
+			return -E_INVAL;
+		curenv->env_ipc_dstva = dstva;
+	}
+  for(env in envs){
+    if(env->env_ipc_sending && env->env_ipc_to == curenv->env_id){
+	    curenv->env_ipc_from = env->env_id;
+
+      if(curenv->env_ipc_dstva != NULL){
+        sys_page_map(env->env_id,env->env_ipc_send_va,curenv->env_id, dstva, perm, false);
+      }
+
+      curenv->env_ipc_value = env->env_ipc_send_value;
+      env->env_ipc_sending = false;
+      env->env_status = ENV_RUNNABLE;
+      return 0;
+    }
+  }
+
+  //Ejecutamos el resto del código de sys_ipc_recv()
+}
+```
+
+No se produce un deadlock ya que si el send bloquea al proceso A, cuando el proceso B llame a receive, éste lo desbloqueará (dentro del ciclo for). Si el receive bloquea al proceso A, cuando el proceso B llame al send, éste también lo desbloqueará ya que así estaba implementado desde un principio, y lo seguimos manteniendo.
+Si varios procesos (A1,A2,..) quieren enviar a B, cada uno setea sus respectivos campos y quedan bloqueados. Cuando B llame a receive (una vez por cada proceso que llamó a send), se irán desbloqueando en el orden que estén en el arreglo envs.
