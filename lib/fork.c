@@ -25,6 +25,8 @@ pgfault(struct UTrapframe *utf)
 	//   (see <inc/memlayout.h>).
 
 	// LAB 4: Your code here.
+	if((err & FEC_WR) == 0 || (err & FEC_PR) == 1 || (uvpt[(uint32_t)addr/PGSIZE] & PTE_COW) == 0)
+		panic("pgfault: %e", err);
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
@@ -33,8 +35,10 @@ pgfault(struct UTrapframe *utf)
 	//   You should make three system calls.
 
 	// LAB 4: Your code here.
-
-	panic("pgfault not implemented");
+	sys_page_alloc(0, PFTEMP, PTE_U | PTE_P | PTE_W);
+	memmove(PFTEMP, addr, PGSIZE);
+	sys_page_map(0, PFTEMP, 0, addr, PTE_U | PTE_P | PTE_W);
+	sys_page_unmap(0, PFTEMP);
 }
 
 //
@@ -52,9 +56,20 @@ static int
 duppage(envid_t envid, unsigned pn)
 {
 	int r;
+	int perm = PTE_U | PTE_P;
 
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
+	pte_t pte = uvpt[pn];
+	void* addr = (void*)(pn*PGSIZE);
+	
+	if (pte & PTE_W || pte & PTE_COW) {
+		perm |= PTE_COW;
+		if( (r = sys_page_map(0, addr, 0, addr, perm)) < 0)
+			return r;
+	}
+	
+	if( (r = sys_page_map(0, addr, envid, addr, perm)) < 0)
+		return r;
+
 	return 0;
 }
 
@@ -129,8 +144,42 @@ fork_v0(void)
 envid_t
 fork(void)
 {
+	//return fork_v0();
 	// LAB 4: Your code here.
-	return fork_v0();
+	envid_t envid;
+	uint8_t *addr;
+	int r;
+
+	set_pgfault_handler(pgfault);
+
+	envid = sys_exofork();
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	if (envid == 0) {
+		thisenv = &envs[ENVX(sys_getenvid())];
+		set_pgfault_handler(pgfault);
+		return 0;
+	}
+
+	for (addr = 0; (uint32_t) addr < UXSTACKTOP-PGSIZE; addr += PGSIZE) {
+
+		pde_t pde = uvpd[PDX(addr)];
+		if ((pde & PTE_P) == 0) {
+			addr += PTSIZE - PGSIZE;
+			continue;
+		}
+			
+		pte_t pte = uvpt[PGNUM(addr)];
+		if ((pte & PTE_P) == 0)
+			continue;
+
+		duppage(envid, (unsigned)addr/PGSIZE);
+	}
+
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+
+	return envid;
 }
 
 // Challenge!
