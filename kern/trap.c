@@ -386,22 +386,23 @@ page_fault_handler(struct Trapframe *tf)
 
 	struct UTrapframe *u;
 
-    if(tf->tf_esp < UXSTACKTOP && tf->tf_esp > UXSTACKTOP-PGSIZE)
-		u = (struct UTrapframe*)(tf->tf_esp - 4 - sizeof(struct UTrapframe));
+	if (tf->tf_esp < UXSTACKTOP && tf->tf_esp > UXSTACKTOP - PGSIZE)
+		u = (struct UTrapframe *) (tf->tf_esp - 4 -
+		                           sizeof(struct UTrapframe));
 	else
-    	u = (struct UTrapframe*)(UXSTACKTOP - sizeof(struct UTrapframe));
+		u = (struct UTrapframe *) (UXSTACKTOP - sizeof(struct UTrapframe));
 
-    user_mem_assert(curenv, u, sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
+	user_mem_assert(curenv, u, sizeof(struct UTrapframe), PTE_U | PTE_P | PTE_W);
 
-    u->utf_fault_va = fault_va;
-    u->utf_err = tf->tf_err;
-    u->utf_regs = tf->tf_regs;
-    u->utf_eip = tf->tf_eip;
-    u->utf_eflags = tf->tf_eflags;
-    u->utf_esp = tf->tf_esp;
+	u->utf_fault_va = fault_va;
+	u->utf_err = tf->tf_err;
+	u->utf_regs = tf->tf_regs;
+	u->utf_eip = tf->tf_eip;
+	u->utf_eflags = tf->tf_eflags;
+	u->utf_esp = tf->tf_esp;
 
-	tf->tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
-	tf->tf_esp = (uintptr_t)u;
+	tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+	tf->tf_esp = (uintptr_t) u;
 
 	env_run(curenv);
 }
