@@ -179,14 +179,12 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
-	cprintf("blockno es %08x\n", filebno);
 	// LAB 5: Your code here.
 	uint32_t *ppdiskbno;
 	int err = file_block_walk(f, filebno, &ppdiskbno, true);
 	if (err < 0)
 		return err;
 
-	cprintf("ppdiskbno vale %08x\n", *ppdiskbno);
 	if (*ppdiskbno == 0) {
 		uint32_t new_block = alloc_block();
 		if (new_block == -E_NO_DISK)
