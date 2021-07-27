@@ -140,9 +140,8 @@ spawn(const char *prog, const char **argv)
 		panic("copy_shared_pages: %e", r);
 
 	child_tf.tf_eflags |= FL_IOPL_3;  // devious: see user/faultio.c
-	if ((r = sys_env_set_trapframe(child, &child_tf)) < 0) {
+	if ((r = sys_env_set_trapframe(child, &child_tf)) < 0)
 		panic("sys_env_set_trapframe: %e", r);
-	}
 
 	if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
@@ -338,7 +337,9 @@ copy_shared_pages(envid_t child)
 
 		int r;
 		int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
-		if ((perm & PTE_SHARE) && (r = sys_page_map(0, (void*)addr, child, (void*)addr, perm)) < 0)
+		if ((perm & PTE_SHARE) &&
+		    (r = sys_page_map(
+		             0, (void *) addr, child, (void *) addr, perm)) < 0)
 			return r;
 	}
 	return 0;

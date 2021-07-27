@@ -160,7 +160,6 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 
 			f->f_indirect = new_block;
 		}
-		cprintf("f indirect: %08x\n", f->f_indirect);
 		uint32_t *addr = diskaddr(f->f_indirect);
 		*ppdiskbno = &addr[filebno - NDIRECT];
 		return 0;
