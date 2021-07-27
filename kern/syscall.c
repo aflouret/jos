@@ -269,9 +269,8 @@ sys_page_map(envid_t srcenvid,
 	    ((uint32_t) srcva % PGSIZE != 0) || ((uint32_t) srcva % PGSIZE != 0))
 		return -E_INVAL;
 
-	if ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P) ||
-	    (perm & ~PTE_SYSCALL) != 0)
-		return -E_INVAL;
+	perm |= PTE_U | PTE_P;
+	perm &= PTE_SYSCALL;
 
 	struct Env *srcenv;
 	struct Env *dstenv;

@@ -324,7 +324,7 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
-	for (addr = 0; (uint32_t) addr < UXSTACKTOP - PGSIZE; addr += PGSIZE) {
+	for (uint32_t addr = 0; addr < UXSTACKTOP - PGSIZE; addr += PGSIZE) {
 		pde_t pde = uvpd[PDX(addr)];
 
 		if ((pde & PTE_P) == 0) {
@@ -336,8 +336,10 @@ copy_shared_pages(envid_t child)
 		if ((pte & PTE_P) == 0)
 			continue;
 
-		if (duppage(envid, (unsigned) addr / PGSIZE) < 0)
-			panic("duppage");
+		int r;
+		int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
+		if ((perm & PTE_SHARE) && (r = sys_page_map(0, (void*)addr, child, (void*)addr, perm)) < 0)
+			return r;
 	}
 	return 0;
 }
