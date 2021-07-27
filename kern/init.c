@@ -71,7 +71,7 @@ i386_init(void)
 
 	if (TESTED(user_yield) || TESTED(user_spin0))
 		ENV_CREATE(TEST, ENV_TYPE_USER);
-#else 
+#else
 	// Touch all you want.
 	ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif  // TEST*
