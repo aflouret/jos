@@ -336,7 +336,7 @@ copy_shared_pages(envid_t child)
 			continue;
 
 		int r;
-		int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
+		int perm = pte & PTE_SYSCALL;
 		if ((perm & PTE_SHARE) &&
 		    (r = sys_page_map(
 		             0, (void *) addr, child, (void *) addr, perm)) < 0)

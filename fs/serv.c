@@ -227,6 +227,8 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
 		return r;
 
+	if (req->req_n > sizeof(ret->ret_buf))
+		req->req_n = sizeof(ret->ret_buf);
 	if ((r = file_read(o->o_file, ret->ret_buf, req->req_n, o->o_fd->fd_offset)) <
 	    0)
 		return r;
@@ -255,6 +257,9 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	int r;
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
 		return r;
+
+	if (req->req_n > sizeof(req->req_buf))
+		req->req_n = sizeof(req->req_buf);
 
 	if ((r = file_write(
 	             o->o_file, req->req_buf, req->req_n, o->o_fd->fd_offset)) < 0)

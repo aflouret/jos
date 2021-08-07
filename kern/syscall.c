@@ -140,14 +140,16 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	// LAB 5: Your code here.
 	// Remember to check whether the user has supplied us with a good
 	// address!
-	if ((uint32_t) tf >= UTOP)
-		panic("Address out of range");
+
 
 	struct Env *e;
 	int err = envid2env(envid, &e, 1);
 	if (err)
 		return err;
 
+	if (user_mem_check(
+	            e, (void *) tf, sizeof(struct Trapframe), PTE_P | PTE_U) < 0)
+		panic("Invalid address");
 	e->env_tf = *tf;
 
 	e->env_tf.tf_eflags &= ~FL_IOPL_3;

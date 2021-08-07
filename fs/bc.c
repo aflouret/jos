@@ -51,9 +51,13 @@ bc_pgfault(struct UTrapframe *utf)
 	//
 	// LAB 5: you code here:
 
-	sys_page_alloc(0, ROUNDDOWN(addr, PGSIZE), PTE_P | PTE_W | PTE_U);
+	if ((r = sys_page_alloc(0, ROUNDDOWN(addr, PGSIZE), PTE_P | PTE_W | PTE_U)) <
+	    0)
+		panic("in bc_pgfault, sys_page_alloc: %e", r);
 	uint32_t secno = blockno * BLKSECTS;
-	ide_read(secno, ROUNDDOWN(addr, PGSIZE), BLKSECTS);
+	if ((r = ide_read(secno, ROUNDDOWN(addr, PGSIZE), BLKSECTS)) < 0)
+		panic("in bc_pgfault, ide_read: %e", r);
+
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
@@ -92,7 +96,7 @@ flush_block(void *addr)
 		             addr_aligned,
 		             0,
 		             addr_aligned,
-		             uvpt[PGNUM(addr)] & ~PTE_D & PTE_SYSCALL);
+		             uvpt[PGNUM(addr)] & PTE_SYSCALL);
 	}
 }
 

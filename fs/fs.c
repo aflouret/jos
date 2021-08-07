@@ -66,7 +66,7 @@ alloc_block(void)
 
 	// LAB 5: Your code here.
 
-	for (int i = 0; i < super->s_nblocks; i++) {
+	for (int i = 3; i < super->s_nblocks; i++) {
 		if (block_is_free(i)) {
 			bitmap[i / 32] &= ~(1 << (i % 32));
 			flush_block(bitmap);
@@ -157,7 +157,9 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 			uint32_t new_block = alloc_block();
 			if (new_block == -E_NO_DISK)
 				return -E_NO_DISK;
-
+			uint32_t *addr = diskaddr(new_block);
+			memset(addr, 0, BLKSIZE);
+			flush_block(addr);
 			f->f_indirect = new_block;
 		}
 		uint32_t *addr = diskaddr(f->f_indirect);
@@ -190,6 +192,7 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 			return -E_NO_DISK;
 
 		*ppdiskbno = new_block;
+		flush_block(diskaddr(new_block));
 	}
 	if (blk != NULL)
 		*blk = diskaddr(*ppdiskbno);
